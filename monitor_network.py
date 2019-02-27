@@ -140,6 +140,7 @@ while True:
 
     ###
     TcpdumpObj.start()
+    sleep(3)
     PingObj.start()
     HttpObj.start()
 
