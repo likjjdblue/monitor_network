@@ -132,7 +132,7 @@ class HttpProcess:
 
 while True:
     TmpCurrentTimeStamp=datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    print ('\n'+'Current time is '+TmpCurrentTimeStamp+'\n')
+    print ('\n'+'Current time is '+TmpCurrentTimeStamp)
     #### 构造实例 ###
     TcpdumpObj=TcpdumpProcess()
     PingObj=PingProcess(TmpIPAddr='www.baidu.com')
