@@ -7,13 +7,29 @@ import subprocess
 import re
 import datetime
 
+###被监控的URL 响应时间阀值（单位：秒）
+MaxHttpResponseTime=1
 
-BaseDir=path.dirname(path.realpath(__file__))
-httptimeout=1
-pingMaxRTT=30
-GlobalSleepInterval=10
+###   被监控的HTTP URL 地址 ####
+MonitorURL='www.baidu.com'
+
+### ping 最大响应时间阀值(单位：毫秒)
+PingMaxRTT=30
+
+###  PING 对端地址（IP ，域名都可以）
+PingAddr='www.baidu.com'
+
+###  被TCPDUMP 抓包的网卡名称 (只能配置单个网卡)
 NICName='ens33'
 
+
+GlobalSleepInterval=10
+
+
+
+
+BaseDir=path.dirname(path.realpath(__file__))
+GlobalLogFile=open(path.join(BaseDir, 'running.log'), mode='ab',buffering=0)
 
 def parseHttpLog():
     ### 检查HTTP 记录，如果HTTP 请求正常返回True,否则False
@@ -24,7 +40,9 @@ def parseHttpLog():
     ReObj=re.search('time_total:\s*(.*?)\n',TmpFileContent,flags=re.MULTILINE|re.UNICODE)
     if  ReObj:
         TmpHttpResponseElapse=float(ReObj.group(1))
-        if TmpHttpResponseElapse>=httptimeout:
+        if TmpHttpResponseElapse>=MaxHttpResponseTime:
+            print ('Http 响应时间异常! '+str(TmpHttpResponseElapse))
+            GlobalLogFile.write('Http 响应时间异常! '+str(TmpHttpResponseElapse)+'\n')
             return False
     return True
 
@@ -41,16 +59,18 @@ def parsePingLog():
             TmpSent=int(ReObj.group(1).strip())
             TmpReceived=int(ReObj.group(2).strip())
             if TmpReceived<TmpSent:
-                print ('ICMP lost packets')
                 isNetworkGood=False
+                GlobalLogFile.write('PING 存在丢包情况'+'\n')
+                print ('PING 存在丢包情况')
             continue
 
         if 'rtt'  in line:
             ReObj=re.search(r'^.*?=(.*?)ms',line)
             TmpMaxRTT=float(ReObj.group(1).strip().split('/')[2])
-            if TmpMaxRTT>=pingMaxRTT:
+            if TmpMaxRTT>=PingMaxRTT:
                 isNetworkGood=False
-            print ('Max rtt is '+str(TmpMaxRTT))
+                GlobalLogFile.write('PING 最大响应时间过大'+'\n')
+                print ('PING 最大响应时间过大')
             break
     TmpFile.close()
     return isNetworkGood
@@ -59,7 +79,7 @@ def parsePingLog():
 
 
 class TcpdumpProcess:
-    def __init__(self,TmpTcpdumpExec='/usr/sbin/tcpdump', TmpNICName=NICName):
+    def __init__(self,TmpTcpdumpExec='/usr/sbin/tcpdump', TmpNICName=None):
         self.TcpdumpExec=TmpTcpdumpExec
         self.NICName=TmpNICName
 
@@ -104,7 +124,7 @@ class PingProcess:
 
 
 class HttpProcess:
-    def __init__(self,TmpUrl, TmpCurlExec='/usr/bin/curl', TmpTimeout=60):
+    def __init__(self,TmpUrl=None, TmpCurlExec='/usr/bin/curl', TmpTimeout=60):
         self.URL=TmpUrl
         self.Timeout=TmpTimeout
         self.CURLExec=TmpCurlExec
@@ -132,11 +152,12 @@ class HttpProcess:
 
 while True:
     TmpCurrentTimeStamp=datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    GlobalLogFile.write('\n'+'Current time is '+TmpCurrentTimeStamp+'\n')
     print ('\n'+'Current time is '+TmpCurrentTimeStamp)
     #### 构造实例 ###
-    TcpdumpObj=TcpdumpProcess()
-    PingObj=PingProcess(TmpIPAddr='www.baidu.com')
-    HttpObj=HttpProcess(TmpUrl='www.baidu.com')
+    TcpdumpObj=TcpdumpProcess(TmpNICName=NICName)
+    PingObj=PingProcess(TmpIPAddr=PingAddr)
+    HttpObj=HttpProcess(TmpUrl=MonitorURL)
 
     ###
     TcpdumpObj.start()
@@ -159,7 +180,10 @@ while True:
     if (not HttpResult) or (not PingResult):
         if not path.isdir(path.join(BaseDir, 'logs')):
             makedirs(path.join(BaseDir, 'logs'))
+        GlobalLogFile.write('generate logs folder....'+'\n')
         print ('generate logs folder....')
         TmpCmd='mv '+path.join(BaseDir, 'tmp')+' '+path.join(BaseDir, 'logs', TmpCurrentTimeStamp)
         subprocess.Popen(TmpCmd, shell=True)
-        sleep (GlobalSleepInterval)
+    print ('Pause for next round.....')
+    GlobalLogFile.write('Pause for next round.....'+'\n')
+    sleep (GlobalSleepInterval)
