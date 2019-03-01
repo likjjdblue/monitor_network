@@ -44,6 +44,11 @@ def parseHttpLog():
             print ('Http 响应时间异常! '+str(TmpHttpResponseElapse))
             GlobalLogFile.write('Http 响应时间异常! '+str(TmpHttpResponseElapse)+'\n')
             return False
+
+    if path.isfile(path.join(BaseDir, 'tmp', 'http_error.log')):
+        print ('Http 请求过程发生异常！')
+        GlobalLogFile.write('Http 请求过程发生异常！'+'\n')
+        return False
     return True
 
 def parsePingLog():
@@ -135,12 +140,17 @@ class HttpProcess:
 
 
         TmpCmd=self.CURLExec+' -w @'+str(path.join(BaseDir, 'conf', 'format.txt'))+' -o /dev/null --max-time '\
-               +str(self.Timeout)+' -s '+self.URL
-        self.Pobj=subprocess.Popen(TmpCmd.split(), stdout=subprocess.PIPE)
+               +str(self.Timeout)+' -s -S '+self.URL
+        self.Pobj=subprocess.Popen(TmpCmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         with open(path.join(BaseDir, 'tmp', 'http.log'), mode='wb') as f:
             f.write(self.Pobj.stdout.read())
         print (self.Pobj.stdout.read())
+
+        TmpCurlErrorContent=self.Pobj.stderr.read()
+        if len(TmpCurlErrorContent):
+            with open(path.join(BaseDir, 'tmp', 'http_error.log'), mode='wb') as f:
+                f.write(TmpCurlErrorContent)
 
     def stop(self):
         print ('killing CURL process....')
@@ -159,12 +169,13 @@ while True:
     PingObj=PingProcess(TmpIPAddr=PingAddr)
     HttpObj=HttpProcess(TmpUrl=MonitorURL)
 
-    ###
+    ### 启动实例 ####
     TcpdumpObj.start()
     sleep(3)
     PingObj.start()
     HttpObj.start()
 
+    ###依次销毁实例 ###
     HttpObj.stop()
     del HttpObj
 
@@ -174,6 +185,7 @@ while True:
     TcpdumpObj.stop()
     del TcpdumpObj
 
+    ### 解析日志 ####
     HttpResult=parseHttpLog()
     PingResult=parsePingLog()
 
