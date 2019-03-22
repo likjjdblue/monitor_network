@@ -182,12 +182,14 @@ while True:
     PingObj.stop()
     del PingObj
 
-    TcpdumpObj.stop()
-    del TcpdumpObj
 
     ### 解析日志 ####
     HttpResult=parseHttpLog()
     PingResult=parsePingLog()
+
+    sleep(5)
+    TcpdumpObj.stop()
+    del TcpdumpObj
 
     if (not HttpResult) or (not PingResult):
         if not path.isdir(path.join(BaseDir, 'logs')):
